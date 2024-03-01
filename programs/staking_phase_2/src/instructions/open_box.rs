@@ -1,13 +1,9 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::{transfer, Mint, Token, TokenAccount, Transfer},
-};
 
 use crate::{
     errors::StakeError,
     seeds::*,
-    state::{PoolInfo, UserInfo},
+    state::{ClaimInfo, PoolInfo, UserInfo},
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
@@ -24,11 +20,6 @@ pub struct OpenBox<'info> {
     pub pool_info: Box<Account<'info, PoolInfo>>,
 
     #[account(
-        constraint = mint_account.key()==pool_info.demr_mint @ StakeError::DemrError,
-    )]
-    mint_account: Box<Account<'info, Mint>>,
-
-    #[account(
         mut,
         seeds = [
             USER_INFO_SEED,
@@ -39,38 +30,22 @@ pub struct OpenBox<'info> {
     pub user_info: Box<Account<'info, UserInfo>>,
 
     #[account(
-        mut,
-        associated_token::mint = mint_account,
-        associated_token::authority = pool_info
-    )]
-    pub pool_asset_account: Box<Account<'info, TokenAccount>>,
-
-    #[account(
-        init_if_needed,
+        init,
         payer = signer,
-        associated_token::mint = mint_account,
-        associated_token::authority = signer,
+        seeds = [
+            CLAIM_INFO_SEED,
+            signer.key().as_ref(),
+            user_info.claim_count.to_be_bytes().as_ref(),
+        ],
+        bump,
+        space = 8+ ClaimInfo::INIT_SPACE,
     )]
-    pub user_asset_account: Box<Account<'info, TokenAccount>>,
+    pub claim_info: Box<Account<'info, ClaimInfo>>,
 
     #[account(mut)]
     pub signer: Signer<'info>,
 
-    pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
-}
-
-impl<'info> OpenBox<'info> {
-    pub fn transfer_demr_reward_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
-        let cpi_accounts = Transfer {
-            from: self.pool_asset_account.to_account_info(),
-            to: self.user_asset_account.to_account_info(),
-            authority: self.pool_info.to_account_info(),
-        };
-        let cpi_program = self.token_program.to_account_info();
-        CpiContext::new(cpi_program, cpi_accounts)
-    }
 }
 
 pub fn open_box_handler(ctx: Context<OpenBox>, args: OpenBoxArgs) -> Result<()> {
@@ -83,6 +58,7 @@ pub fn open_box_handler(ctx: Context<OpenBox>, args: OpenBoxArgs) -> Result<()> 
     );
     user_info.pending_box -= args.num;
     user_info.opened_box += args.num;
+    user_info.claim_count += 1;
 
     let clock = Clock::get()?;
     let cur_timestamp = clock.unix_timestamp as u64;
@@ -105,17 +81,9 @@ pub fn open_box_handler(ctx: Context<OpenBox>, args: OpenBoxArgs) -> Result<()> 
         msg!("reward: {},{}", random, reward_);
         reward += reward_;
     }
-
-    let bump = pool_info.stake_bump;
-    let demr_seed = &[&POOL_CONFIG_SEED[..], &[bump]];
-    let signer_seeds = &[&demr_seed[..]];
-
-    transfer(
-        ctx.accounts
-            .transfer_demr_reward_ctx()
-            .with_signer(signer_seeds),
-        reward,
-    )?;
+    let claim_info = &mut ctx.accounts.claim_info;
+    claim_info.bump = ctx.bumps.claim_info;
+    claim_info.reward = reward;
 
     Ok(())
 }

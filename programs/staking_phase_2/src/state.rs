@@ -9,9 +9,11 @@ pub struct PoolInfo {
     pub admin: Pubkey,
     pub collection: [Pubkey; 2],
     pub demr_mint: Pubkey,
-    pub energy_per_sec: [u64; 2],
+    pub per_period: i64,
+    pub energy_per_period: [u64; 2],
     pub energy_per_box: u64,
     pub stake_start: [i64; 2],
+    pub stake_end: [i64; 2],
     pub demr_stake_amount: u64,
     pub demr_per_box: [u64; 8],
     pub open_box_rate: [u64; 8],
@@ -37,6 +39,12 @@ impl PoolInfo {
                 StakeError::StartError
             );
         }
+        if self.stake_end[collection_index] > 0 {
+            require!(
+                cur <= self.stake_end[collection_index],
+                StakeError::StartError
+            );
+        }
         Ok(())
     }
 }
@@ -46,12 +54,6 @@ impl PoolInfo {
 pub struct StakeInfo {
     pub nft_mint: Pubkey,
     pub collection: u8,
-}
-
-#[account]
-#[derive(InitSpace)]
-pub struct ClaimInfo {
-    pub reward: u64,
 }
 
 #[account]
@@ -79,19 +81,35 @@ pub struct UserInfo {
     pub demr_reward: u64,
     pub last_calimed_time: i64,
     pub total_staked: [u64; 2],
+    pub claim_count: u64,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct ClaimInfo {
+    pub bump: u8,
+    pub reward: u64,
+    pub claimed: bool,
 }
 
 impl UserInfo {
-    pub fn claim_pending_energy(&mut self, cur: i64) {
-        if cur > self.last_calimed_time {
-            let delta_sec = cur - self.last_calimed_time;
-            for collection_index in 0..2 {
-                if self.total_staked[collection_index] > 0 {
-                    let energy = (delta_sec as u64) * self.total_staked[collection_index];
+    pub fn claim_pending_energy(&mut self, pool_info: &PoolInfo, cur: i64) {
+        for collection_index in 0..2 {
+            let _cur = if cur > pool_info.stake_end[collection_index] {
+                pool_info.stake_end[collection_index]
+            } else {
+                cur
+            };
+            if _cur > self.last_calimed_time && self.total_staked[collection_index] > 0 {
+                let delta_period = (_cur - self.last_calimed_time) / pool_info.per_period;
+                if delta_period > 0 {
+                    let energy = (delta_period as u64)
+                        * self.total_staked[collection_index]
+                        * pool_info.energy_per_period[collection_index];
                     self.energy += energy as u128;
                 }
             }
-            self.last_calimed_time = cur;
         }
+        self.last_calimed_time = cur;
     }
 }

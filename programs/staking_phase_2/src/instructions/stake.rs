@@ -88,7 +88,7 @@ pub struct Stake<'info> {
         bump,
         constraint = nft_metadata.collection.as_ref().unwrap().verified @ StakeError::CollectionNotVerified,
     )]
-    nft_metadata: Box<Account<'info, MetadataAccount>>,
+    pub nft_metadata: Box<Account<'info, MetadataAccount>>,
 
     #[account(mut)]
     pub signer: Signer<'info>,
@@ -171,7 +171,7 @@ pub fn stake_handler<'a, 'b, 'c: 'info, 'info>(
             StakeError::UserInfoBumpError
         );
     }
-    user_info.claim_pending_energy(stake_at);
+    user_info.claim_pending_energy(pool_info,stake_at);
     user_info.stake_id = user_info.stake_id + 1;
     user_info.total_staked[collection_index] += 1;
 
@@ -201,6 +201,12 @@ pub fn check_key<'info>(
 ) -> Result<()> {
     let (demr_authority_key, demr_authority_bump) =
         Pubkey::find_program_address(&[b"demr-stake-authority"], program_id);
+
+    require!(user_demr_account.is_writable, StakeError::AccWritableError);
+    require!(
+        demr_custody_account.is_writable,
+        StakeError::AccWritableError
+    );
     require!(
         demr_authority_key == demr_authority.key() && demr_authority_bump == demr_stake_bump,
         StakeError::DemrAuthError

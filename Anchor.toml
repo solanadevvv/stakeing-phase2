@@ -5,13 +5,14 @@ seeds = false
 skip-lint = false
 
 [programs.devnet]
-demr = "CLjotqSXscvfm7FTfr1NoR9tz45EeFMm6nCYNRBcYpd4"
+demr = "CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU"
 mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
-staking_phase_2 = "21NP2mv5RqPdkdvDJYrAWWwcVsUkrMUvWfdw3aNftDBT"
+staking_phase_2 = "8o2Cp5y8BPvFYsqaL9beYQPCs5Uy7XvFy5r3xvz9VNew"
 
 [programs.localnet]
+demr = "CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU"
 mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
-staking_phase_2 = "21NP2mv5RqPdkdvDJYrAWWwcVsUkrMUvWfdw3aNftDBT"
+staking_phase_2 = "8o2Cp5y8BPvFYsqaL9beYQPCs5Uy7XvFy5r3xvz9VNew"
 
 [programs.mainnet]
 mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
@@ -20,17 +21,16 @@ mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "./id.json"
 
 [scripts]
-demr = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/mock_demr.ts"
-mock_nft = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/mock_nft.ts"
+mock_demr = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 scripts/mock_demr.ts"
+demr = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 scripts/demr.ts"
 staking = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/staking.ts"
 staking_phase_2 = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 scripts/staking_phase_2.ts"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/staking_phase_2.ts"
 test_mpl = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/mpl_api_test.ts"
-
 
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

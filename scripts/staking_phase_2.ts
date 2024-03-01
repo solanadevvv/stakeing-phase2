@@ -1,34 +1,46 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, web3, Wallet, AnchorProvider, BN } from "@coral-xyz/anchor";
-import { Staking, IDL } from "../target/types/staking";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { StakingPhase2, IDL } from "../target/types/staking_phase_2";
+import {
+  getAssociatedTokenAddressSync,
+  getOrCreateAssociatedTokenAccount,
+  createAssociatedTokenAccountInstruction,
+} from "@solana/spl-token";
 import * as Buffer from "buffer";
 import { PublicKey, Metaplex, Nft, Metadata } from "@metaplex-foundation/js";
 import { SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { expect } from "chai";
+import bs58 from "bs58";
 
 describe("staking", () => {
   // Configure the client to use the local cluster.
 
-  anchor.setProvider(anchor.AnchorProvider.env());
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+
+  const signer = provider.publicKey!;
 
   const program = new Program(
     IDL,
-    "EyiQF2NwqxgACP6yTqrxbBndGsEmA5fJ9bLxNVnLnWPT",
+    "8o2Cp5y8BPvFYsqaL9beYQPCs5Uy7XvFy5r3xvz9VNew",
     anchor.getProvider()
   );
 
   // const program = anchor.workspace.Staking as Program<Staking>;
 
-  const demrMint = new PublicKey(
-    "FL8pJqtdYE57qPqsWsRmpw8ydh6QBMaM3vFzyskG2DCF"
+  const [demrMint] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.Buffer.from("mint")],
+    new PublicKey("CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU")
   );
+
+  console.log(demrMint.toBase58());
 
   const collection1Addr = new PublicKey(
     "7uqzvGccE64bRmyBVr3knP9pG9hgJZpJXF7XPKvMiEwA"
   );
 
+  // const collection2Addr = PublicKey.default;
   const collection2Addr = new PublicKey(
     "69Y7QVv6hMx7T7GHiQaHUmxFARhDeymt26yscDaLE5Uh"
   );
@@ -48,11 +60,15 @@ describe("staking", () => {
     program.programId
   );
 
+  console.log("PoolInfoPDA ", PoolInfoPDA.toBase58());
+
   const poolAssetPDA = getAssociatedTokenAddressSync(
     demrMint,
     PoolInfoPDA,
     true
   );
+
+  // console.log("todo mint reward to  poolAssetPDA:", poolAssetPDA.toBase58());
 
   const [ClaimConfigPDA] = web3.PublicKey.findProgramAddressSync(
     [Buffer.Buffer.from("claim-config", "utf8")],
@@ -105,27 +121,29 @@ describe("staking", () => {
     TOKEN_METADATA_PROGRAM_ID
   );
 
-  console.log("todo mint reward to  PoolInfoPDA:", PoolInfoPDA.toBase58());
-  console.log("todo mint reward to  poolAssetPDA:", poolAssetPDA.toBase58());
-  console.log("todo create demrAuthorityPDA", demrAuthorityPDA.toBase58());
-
-  // it("Is initialized!", async () => {
-
-  //   const TokenAccount = getAssociatedTokenAddressSync(
-  //     CollectionMint,
-  //     program.provider.publicKey
+  // it("pri", async () => {
+  //   let secretKey = bs58.decode(
+  //     ""
   //   );
+  //   console.log(`[${web3.Keypair.fromSecretKey(secretKey).secretKey}]`);
 
+  //   // exporting back from Uint8Array to bs58 private key
+  //   // == from solana cli id.json key file to phantom private key
+
+  //   // privkey = new Uint8Array([111, 43, 24, ...]); // content of id.json here
+  //   // console.log(bs58.encode(privkey));
+  // });
+
+  // it("stakeing phase2 Is initialized!", async () => {
   //   try {
   //     const tx = await program.methods
   //       .initStaking({
-  //         collection1: collection1Addr,
-  //         collection2: collection2Addr,
+  //         collection: [collection1Addr, collection1Addr],
   //       })
   //       .accounts({
   //         poolInfo: PoolInfoPDA,
   //         demrAuthority: demrAuthorityPDA,
-  //         creator: program.provider.publicKey,
+  //         admin: signer,
   //       })
   //       .rpc();
   //     console.log("Your transaction signature", tx);
@@ -134,68 +152,69 @@ describe("staking", () => {
   //   }
   // });
 
-  // it("update config!", async () => {
+  it("update config!", async () => {
+    // console.log("demrAuthorityPDA",demrAuthorityPDA.toBase58())
+    const createNewTokenTransaction = new web3.Transaction().add(
+      createAssociatedTokenAccountInstruction(
+        provider.publicKey,
+        getAssociatedTokenAddressSync(demrMint, demrAuthorityPDA, true), //Associated token account
+        demrAuthorityPDA, //token owner
+        demrMint //Mint
+      )
+    );
+    await provider.sendAndConfirm(createNewTokenTransaction);
 
-  //   try {
-  //     const cur = Math.floor(Date.now() / 1000);
-  //     const tx = await program.methods
-  //       .updatePoolInfo({
-  //         creator:null,
-  //         collection1: collection1Addr,
-  //         collection2: collection2Addr,
-  //         demrMint: demrMint,
-  //         period1: [new anchor.BN(1706754600), new anchor.BN(1706755800)],
-  //         period2: [new anchor.BN(1706754600), new anchor.BN(1706755800)],
-  //         reward1: [
-  //           new anchor.BN("2000000000"),
-  //           new anchor.BN("1000000000"),
-  //           new anchor.BN("100000000"),
-  //         ],
-  //         reward2: [
-  //           new anchor.BN("2000000000"),
-  //           new anchor.BN("1000000000"),
-  //           new anchor.BN("100000000"),
-  //         ],
-  //         intervalEnergy: [new anchor.BN("500"), new anchor.BN("500")],
-  //         interval: new anchor.BN("60"),
-  //         energyPerBox: new anchor.BN("1"),
-  //         stakeStart: [new anchor.BN(1706757000), new anchor.BN(1706757000)],
-  //         demrStakeAmount: new anchor.BN("1000000000"),
-  //         demrPerBox: [
-  //           new anchor.BN("1000000000"),
-  //           new anchor.BN("2000000000"),
-  //           new anchor.BN("3000000000"),
-  //           new anchor.BN("4000000000"),
-  //           new anchor.BN("5000000000"),
-  //           new anchor.BN("6000000000"),
-  //           new anchor.BN("8000000000"),
-  //           new anchor.BN("10000000000"),
-  //         ],
-  //         openBoxRate: [
-  //           new anchor.BN("10000"),
-  //           new anchor.BN("24000"),
-  //           new anchor.BN("44000"),
-  //           new anchor.BN("74000"),
-  //           new anchor.BN("84000"),
-  //           new anchor.BN("94000"),
-  //           new anchor.BN("99000"),
-  //           new anchor.BN("100000"),
-  //         ],
-  //       })
-  //       .accounts({
-  //         poolInfo: PoolInfoPDA,
-  //         signer: program.provider.publicKey,
-  //       })
-  //       .rpc();
-  //     console.log("Your transaction signature", tx);
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
+    // try {
+    //   const cur = Math.floor(Date.now() / 1000);
+    //   const tx = await program.methods
+    //     .updatePoolInfo({
+    //       admin: null,
+    //       collection: [collection1Addr, collection2Addr],
+    //       demrMint: demrMint,
+    //       energyPerBox: new anchor.BN("10"),
+    //       perPeriod: new anchor.BN("300"), //to update
+    //       energyPerPeriod: [new anchor.BN("1"), new anchor.BN("12")],
+    //       stakeStart: [new anchor.BN(cur), new anchor.BN(cur)],
+    //       stakeEnd: [
+    //         new anchor.BN(cur + 3600 * 5),
+    //         new anchor.BN(cur + 3600 * 5),
+    //       ],
+    //       demrStakeAmount: new anchor.BN("500000000000"),
+    //       demrPerBox: [
+    //         new anchor.BN("1000000000"),
+    //         new anchor.BN("2000000000"),
+    //         new anchor.BN("3000000000"),
+    //         new anchor.BN("4000000000"),
+    //         new anchor.BN("5000000000"),
+    //         new anchor.BN("6000000000"),
+    //         new anchor.BN("8000000000"),
+    //         new anchor.BN("10000000000"),
+    //       ],
+    //       openBoxRate: [
+    //         new anchor.BN("10000"),
+    //         new anchor.BN("20000"),
+    //         new anchor.BN("34000"),
+    //         new anchor.BN("64000"),
+    //         new anchor.BN("84000"),
+    //         new anchor.BN("94000"),
+    //         new anchor.BN("99000"),
+    //         new anchor.BN("100000"),
+    //       ],
+    //     })
+    //     .accounts({
+    //       poolInfo: PoolInfoPDA,
+    //       signer: provider.publicKey,
+    //     })
+    //     .rpc();
+    //   console.log("Your transaction signature", tx);
+    // } catch (error) {
+    //   console.log(error);
+    // }
 
-  //   const poolInfo = await program.account.poolInfo.fetch(PoolInfoPDA);
-  //   console.log("poolInfo", poolInfo);
-  //   console.log("demrMint", poolInfo.demrMint.toBase58());
-  // });
+    // const poolInfo = await program.account.poolInfo.fetch(PoolInfoPDA);
+    // console.log("poolInfo", poolInfo);
+    // console.log("demrMint", poolInfo.demrMint.toBase58());
+  });
 
   // it(" demr pre ", async () => {
   //   console.log(
@@ -228,8 +247,9 @@ describe("staking", () => {
   //     owner: program.provider.publicKey,
   //   });
   //   console.log(myNfts.length);
-  //   const nft = myNfts[5] as Metadata;
+  //   const nft = myNfts[1] as Metadata;
   //   const mintAddr = nft.mintAddress;
+  //   console.log(nft);
   //   console.log(mintAddr.toBase58());
 
   //   const [nftInfoPDA] = web3.PublicKey.findProgramAddressSync(
@@ -240,6 +260,7 @@ describe("staking", () => {
   //   const [stakeInfoPDA] = web3.PublicKey.findProgramAddressSync(
   //     [
   //       Buffer.Buffer.from("stake-info", "utf8"),
+  //       program.provider.publicKey.toBuffer(),
   //       stakeId.toArrayLike(Buffer.Buffer, "be", 8),
   //     ],
   //     program.programId
@@ -302,6 +323,7 @@ describe("staking", () => {
   //   const [stakeInfoPDA] = web3.PublicKey.findProgramAddressSync(
   //     [
   //       Buffer.Buffer.from("stake-info", "utf8"),
+  //       program.provider.publicKey.toBuffer(),
   //       userInfo.stakeId
   //         .sub(new anchor.BN("1"))
   //         .toArrayLike(Buffer.Buffer, "be", 8),
@@ -334,6 +356,7 @@ describe("staking", () => {
   //       staker: program.provider.publicKey,
   //       poolInfo: PoolInfoPDA,
   //       nftInfo: nftInfoPDA,
+  //       userInfo: userInfoPDA,
   //       nftMint: mintAddr,
   //       nftReceiveAccount: nftReceiveAccount,
   //       nftCustody: nftCustody,

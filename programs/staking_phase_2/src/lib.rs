@@ -7,7 +7,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("21NP2mv5RqPdkdvDJYrAWWwcVsUkrMUvWfdw3aNftDBT");
+declare_id!("8o2Cp5y8BPvFYsqaL9beYQPCs5Uy7XvFy5r3xvz9VNew");
 
 #[program]
 pub mod staking_phase_2 {
@@ -43,5 +43,9 @@ pub mod staking_phase_2 {
 
     pub fn open_box(ctx: Context<OpenBox>, args: OpenBoxArgs) -> Result<()> {
         open_box_handler(ctx, args)
+    }
+
+    pub fn claim(ctx: Context<Claim>, claim_index: u64) -> Result<()> {
+        claim_handler(ctx, claim_index)
     }
 }

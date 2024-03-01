@@ -7,12 +7,14 @@ pub struct UpdatePoolInfoArgs {
     pub admin: Option<Pubkey>,
     pub collection: Option<[Pubkey; 2]>,
     pub demr_mint: Option<Pubkey>,
-    pub energy_per_sec: Option<[u64; 2]>,
+    pub energy_per_period: Option<[u64; 2]>,
     pub energy_per_box: Option<u64>,
     pub stake_start: Option<[i64; 2]>,
+    pub stake_end: Option<[i64; 2]>,
     pub demr_stake_amount: Option<u64>,
     pub demr_per_box: Option<[u64; 8]>,
     pub open_box_rate: Option<[u64; 8]>,
+    pub per_period: Option<i64>,
 }
 
 #[derive(Accounts)]
@@ -52,9 +54,9 @@ pub fn update_pool_info_handler(
         pool_info.demr_mint = args.demr_mint.unwrap();
         msg!("demr_mint update {}", pool_info.demr_mint);
     }
-    if let Some(energy_per_sec) = args.energy_per_sec {
-        pool_info.energy_per_sec = energy_per_sec;
-        msg!("energy_per_sec update");
+    if let Some(energy_per_period) = args.energy_per_period {
+        pool_info.energy_per_period = energy_per_period;
+        msg!("energy_per_period update");
     }
     if let Some(energy_per_box) = args.energy_per_box {
         pool_info.energy_per_box = energy_per_box;
@@ -63,6 +65,10 @@ pub fn update_pool_info_handler(
     if let Some(stake_start) = args.stake_start {
         pool_info.stake_start = stake_start;
         msg!("stake_start update");
+    }
+    if let Some(stake_end) = args.stake_end {
+        pool_info.stake_end = stake_end;
+        msg!("stake_end update");
     }
     if let Some(demr_stake_amount) = args.demr_stake_amount {
         pool_info.demr_stake_amount = demr_stake_amount;
@@ -76,6 +82,9 @@ pub fn update_pool_info_handler(
         pool_info.open_box_rate = open_box_rate;
         msg!("open_box_rate update");
     }
-
+    if let Some(per_period) = args.per_period {
+        pool_info.per_period = per_period;
+        msg!("per_period update");
+    }
     Ok(())
 }

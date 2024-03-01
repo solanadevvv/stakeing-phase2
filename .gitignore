@@ -7,3 +7,4 @@ test-ledger
 .yarn
 tests/mock_demr.ts
 id.json
+scripts/mock_demr.ts

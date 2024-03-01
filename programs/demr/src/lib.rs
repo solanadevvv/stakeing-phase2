@@ -1,6 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
+    metadata::{
+        create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
+        Metadata,
+    },
     token::{mint_to, Mint, MintTo, Token, TokenAccount},
 };
 
@@ -10,22 +14,72 @@ pub const MINT_SEED: &[u8] = b"mint";
 #[constant]
 pub const CONFIG_SEED: &[u8] = b"config";
 
-declare_id!("CLjotqSXscvfm7FTfr1NoR9tz45EeFMm6nCYNRBcYpd4");
+#[constant]
+const TOKEN_NAME: &str = "DMR";
+
+#[constant]
+const TOKEN_SYMBOL: &str = "DMR";
+
+#[constant]
+const TOKEN_URL: &str = "https://static.demr.xyz/assets/dmr.json";
+
+#[constant]
+const TOKEN_DECIMALS: u8 = 6;
+
+#[constant]
+const TOKEN_TOTAL_SUPPLY: u64 = 100000000000000000;
+
+declare_id!("CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU");
 
 #[program]
 pub mod demr {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>, manager: Pubkey) -> Result<()> {
-        ctx.accounts.config.bump = ctx.bumps.config;
-        ctx.accounts.config.manager = manager;
-        ctx.accounts.config.mint_bump = ctx.bumps.mint;
+        let config = &mut ctx.accounts.config;
+        config.bump = ctx.bumps.config;
+        config.manager = manager;
+        config.mint_bump = ctx.bumps.mint;
+        config.total_supply = TOKEN_TOTAL_SUPPLY;
+
+        let seeds = CONFIG_SEED;
+        let signer_seeds: &[&[&[u8]]] = &[&[seeds, &[config.bump]]];
+
+        create_metadata_accounts_v3(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_metadata_program.to_account_info(),
+                CreateMetadataAccountsV3 {
+                    metadata: ctx.accounts.metadata_account.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                    mint_authority: ctx.accounts.config.to_account_info(),
+                    update_authority: ctx.accounts.config.to_account_info(),
+                    payer: ctx.accounts.payer.to_account_info(),
+                    system_program: ctx.accounts.system_program.to_account_info(),
+                    rent: ctx.accounts.rent.to_account_info(),
+                },
+                &signer_seeds,
+            ),
+            DataV2 {
+                name: TOKEN_NAME.to_string(),
+                symbol: TOKEN_SYMBOL.to_string(),
+                uri: TOKEN_URL.to_string(),
+                seller_fee_basis_points: 0,
+                creators: None,
+                collection: None,
+                uses: None,
+            },
+            true,
+            true,
+            None,
+        )?;
+
         Ok(())
     }
 
     pub fn mint_token(ctx: Context<MintToken>, amount: u64) -> Result<()> {
-        require!(
-            ctx.accounts.signer.key() <= ctx.accounts.config.manager,
+        require_keys_eq!(
+            ctx.accounts.signer.key(),
+            ctx.accounts.config.manager,
             DemrError::NotManager
         );
         // Create the MintTo struct for our context
@@ -37,7 +91,7 @@ pub mod demr {
         let cpi_program = ctx.accounts.token_program.to_account_info();
         // Create the CpiContext we need for the request
 
-        let seeds = MINT_SEED;
+        let seeds = CONFIG_SEED;
         let signer_seeds: &[&[&[u8]]] = &[&[seeds, &[ctx.accounts.config.bump]]];
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
 
@@ -46,7 +100,6 @@ pub mod demr {
             total <= ctx.accounts.config.total_supply,
             DemrError::TooMuch
         );
-        // Execute anchor's helper function to mint tokens
         mint_to(cpi_ctx, amount)?;
         Ok(())
     }
@@ -59,7 +112,7 @@ pub struct Initialize<'info> {
         seeds = [MINT_SEED],
         bump,
         payer = payer,
-        mint::decimals = 9,
+        mint::decimals = TOKEN_DECIMALS,
         mint::authority = config,
         mint::freeze_authority = config,
     )]
@@ -74,10 +127,16 @@ pub struct Initialize<'info> {
     )]
     pub config: Box<Account<'info, DemrConfig>>,
 
+    /// CHECK:` doc comment explaining why no checks through types are necessary.
+    #[account(mut)]
+    pub metadata_account: UncheckedAccount<'info>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub token_metadata_program: Program<'info, Metadata>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -123,6 +182,7 @@ pub struct DemrConfig {
     pub manager: Pubkey,
     pub bump: u8,
     pub mint_bump: u8,
+    pub vesting_count: u8,
 }
 
 #[error_code]
@@ -131,4 +191,6 @@ pub enum DemrError {
     TooMuch,
     #[msg("not manager")]
     NotManager,
+    #[msg("receiver error")]
+    Receiver,
 }

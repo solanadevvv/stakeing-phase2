@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, web3, Wallet, AnchorProvider, BN } from "@coral-xyz/anchor";
-import { StakingPhase2 } from "../target/types/staking_phase2";
+import { StakingPhase2 } from "../target/types/staking_phase_2";
+import { Demr } from "../target/types/demr";
 import { MockNft } from "../target/types/mock_nft";
 import {
   getAssociatedTokenAddressSync,
@@ -31,6 +32,8 @@ describe("staking", () => {
   const stakingPhase2 = anchor.workspace
     .StakingPhase2 as Program<StakingPhase2>;
   const nft = anchor.workspace.MockNft as Program<MockNft>;
+
+  const demr = anchor.workspace.Demr as Program<Demr>;
 
   const signer = provider.publicKey!;
   const signer1 = Keypair.generate();
@@ -96,6 +99,16 @@ describe("staking", () => {
     stakingPhase2.programId
   );
 
+  const [demrMintPDA] = web3.PublicKey.findProgramAddressSync(
+    [Buffer.Buffer.from("mint", "utf8")],
+    demr.programId
+  );
+
+  const [demrConfPDA] = web3.PublicKey.findProgramAddressSync(
+    [Buffer.Buffer.from("config", "utf8")],
+    demr.programId
+  );
+
   function getAssTokenAddr(
     mint: web3.PublicKey,
     owner: web3.PublicKey
@@ -127,6 +140,45 @@ describe("staking", () => {
       signer1.publicKey,
       anchor.web3.LAMPORTS_PER_SOL * 1
     );
+  });
+
+  it("demr is initialized!", async () => {
+    const [MintMetadataPDA] = web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.Buffer.from("metadata", "utf8"),
+        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+        demrMintPDA.toBuffer(),
+      ],
+      TOKEN_METADATA_PROGRAM_ID
+    );
+
+    await demr.methods
+      .initialize(signer)
+      .accounts({
+        payer: provider.publicKey,
+        mint: demrMintPDA,
+        config: demrConfPDA,
+        metadataAccount:MintMetadataPDA,
+        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+      })
+      .rpc();
+  });
+
+  it("demr minted!", async () => {
+    const receiverAccount = getAssociatedTokenAddressSync(demrMintPDA, signer);
+    await demr.methods
+      .mintToken(new anchor.BN(10000000))
+      .accounts({
+        signer: provider.publicKey,
+        mint: demrMintPDA,
+        config: demrConfPDA,
+        receiver: signer,
+        receiverAccount: receiverAccount,
+      })
+      .rpc();
+
+    const userAcc = await getAccount(provider.connection, receiverAccount);
+    console.log(userAcc);
   });
 
   it("nft is initialized!", async () => {
@@ -293,7 +345,7 @@ describe("staking", () => {
           collection: [collection1Addr, collection1Addr],
           demrMint: demrMint,
           energyPerBox: new anchor.BN("86400"),
-          energyPerSec: [new anchor.BN("100000"), new anchor.BN("100000")],
+          energyPerPeriod: [new anchor.BN("100000"), new anchor.BN("100000")],
           stakeStart: [new anchor.BN(cur), new anchor.BN(cur)],
           demrStakeAmount: new anchor.BN("1000000000"),
           demrPerBox: [
@@ -316,6 +368,7 @@ describe("staking", () => {
             new anchor.BN("99000"),
             new anchor.BN("100000"),
           ],
+          perPeriod: new anchor.BN("86400"),
         })
         .accounts({
           poolInfo: PoolInfoPDA,
@@ -621,7 +674,15 @@ describe("staking", () => {
       true
     );
 
-    console.log(demrAuthorityPDA, userDemrPDA, poolRewardDemrPDA);
+    const userInfo = await stakingPhase2.account.userInfo.fetch(userInfo2PDA);
+    const [claimInfoPDA] = web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.Buffer.from("claim-info", "utf8"),
+        signer.toBuffer(),
+        userInfo.claimCount.toArrayLike(Buffer.Buffer, "be", 8),
+      ],
+      stakingPhase2.programId
+    );
 
     const tx = await stakingPhase2.methods
       .openBox({
@@ -630,8 +691,60 @@ describe("staking", () => {
       .accounts({
         signer: stakingPhase2.provider.publicKey,
         poolInfo: PoolInfoPDA,
-        mintAccount: demrMint,
+        claimInfo: claimInfoPDA,
         userInfo: userInfo2PDA,
+      })
+
+      .transaction();
+    const txn = new web3.Transaction().add(
+      web3.ComputeBudgetProgram.setComputeUnitLimit({
+        units: 300_000,
+      }),
+      tx
+    );
+    try {
+      const txsign = await stakingPhase2.provider.sendAndConfirm!(txn);
+      console.log(txsign);
+    } catch (error) {
+      console.log(error);
+    }
+    console.log(await stakingPhase2.account.userInfo.fetch(userInfo2PDA));
+  };
+
+  const claim = async (claimIndex) => {
+    const claimCount = new anchor.BN(claimIndex);
+    // const nftInfo = await stakingPhase2.account.nftInfo.fetch()
+    const poolInfo = await stakingPhase2.account.poolInfo.fetch(PoolInfoPDA);
+    console.log("poolInfo", poolInfo);
+
+    const poolRewardDemrPDA = getAssociatedTokenAddressSync(
+      demrMint,
+      PoolInfoPDA,
+      true
+    );
+
+    const userDemrPDA = getAssociatedTokenAddressSync(
+      demrMint,
+      stakingPhase2.provider.publicKey!,
+      true
+    );
+
+    const [claimInfoPDA] = web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.Buffer.from("claim-info", "utf8"),
+        signer.toBuffer(),
+        claimCount.toArrayLike(Buffer.Buffer, "be", 8),
+      ],
+      stakingPhase2.programId
+    );
+
+    const tx = await stakingPhase2.methods
+      .claim(claimCount)
+      .accounts({
+        signer: stakingPhase2.provider.publicKey,
+        poolInfo: PoolInfoPDA,
+        mintAccount: demrMint,
+        claimInfo: claimInfoPDA,
         poolAssetAccount: poolRewardDemrPDA,
         userAssetAccount: userDemrPDA,
       })
@@ -652,27 +765,27 @@ describe("staking", () => {
     console.log(await stakingPhase2.account.userInfo.fetch(userInfo2PDA));
   };
 
-  it("stake unstake ", async () => {
-    await mintNft();
-    // await mintNft();
-    // await mintNft();
-    await stake(false);
-    await unstake(false);
-    console.log("stakestakestake");
-    await stake(true);
-    await unstake(true);
-  });
+  // it("stake unstake ", async () => {
+  //   await mintNft();
+  //   // await mintNft();
+  //   // await mintNft();
+  //   await stake(false);
+  //   await unstake(false);
+  //   console.log("stakestakestake");
+  //   await stake(true);
+  //   await unstake(true);
+  // });
 
-  it("stake unstake ", async () => {
-    await mintNft();
-    // await mintNft();
-    // await mintNft();
-    await stake(false);
-    await unstake(false);
-    console.log("stakestakestake");
-    await stake(true);
-    await unstake(true);
-  });
+  // it("stake unstake ", async () => {
+  //   await mintNft();
+  //   // await mintNft();
+  //   // await mintNft();
+  //   await stake(false);
+  //   await unstake(false);
+  //   console.log("stakestakestake");
+  //   await stake(true);
+  //   await unstake(true);
+  // });
 
   // it(" transfer stake  ", async () => {
   //   const result = await mintNft();

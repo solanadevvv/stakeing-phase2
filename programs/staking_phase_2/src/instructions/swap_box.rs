@@ -17,7 +17,7 @@ pub struct SwapBox<'info> {
     #[account(
         mut,
         seeds = [
-            NFT_INFO_SEED,
+            USER_INFO_SEED,
             signer.key().as_ref(),
         ],
         bump = user_info.bump,
@@ -38,7 +38,7 @@ pub fn swap_box_handler<'a, 'b, 'c: 'info, 'info>(
     let current_timestamp = clock.unix_timestamp;
     let pool_info = &ctx.accounts.pool_info;
     let user_info = &mut ctx.accounts.user_info;
-    user_info.claim_pending_energy(current_timestamp);
+    user_info.claim_pending_energy(pool_info, current_timestamp);
     let energy_per_box = pool_info.energy_per_box as u128;
 
     if user_info.energy > 0 && energy_per_box > 0 && box_num > 0 {

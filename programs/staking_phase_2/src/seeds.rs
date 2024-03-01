@@ -14,3 +14,6 @@ pub const USER_INFO_SEED: &[u8] = b"user-info";
 
 #[constant]
 pub const STAKE_INFO_SEED: &[u8] = b"stake-info";
+
+#[constant]
+pub const CLAIM_INFO_SEED: &[u8] = b"claim-info";

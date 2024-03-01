@@ -149,7 +149,7 @@ pub fn unstake_handler<'a, 'b, 'c: 'info, 'info>(
 
     let user_info = &mut ctx.accounts.user_info;
     let collection_index = PoolInfo::get_collection_index(nft_info.collection == 1_u8);
-    user_info.claim_pending_energy(cur);
+    user_info.claim_pending_energy(pool_info, cur);
     user_info.total_staked[collection_index] -= 1;
 
     // Close NFT Custody Account

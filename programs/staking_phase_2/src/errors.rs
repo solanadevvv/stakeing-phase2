@@ -30,4 +30,8 @@ pub enum StakeError {
     RewardZreoError,
     #[msg("no enough energy error")]
     NoEnoughEnergyError,
+    #[msg("account writable error")]
+    AccWritableError,
+    #[msg("claimed error")]
+    ClaimedError,
 }
