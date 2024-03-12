@@ -33,16 +33,15 @@ impl PoolInfo {
     }
 
     pub fn check_stakeable(&self, collection_index: usize, cur: i64) -> Result<()> {
-        if self.stake_start[collection_index] > 0 {
-            require!(
-                cur >= self.stake_start[collection_index],
-                StakeError::StartError
-            );
-        }
+        let stake_start = self.stake_start[collection_index];
+        require!(
+            stake_start > 0 && cur >= stake_start,
+            StakeError::StartError
+        );
         if self.stake_end[collection_index] > 0 {
             require!(
                 cur <= self.stake_end[collection_index],
-                StakeError::StartError
+                StakeError::EndError
             );
         }
         Ok(())

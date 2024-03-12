@@ -5,14 +5,14 @@ seeds = false
 skip-lint = false
 
 [programs.devnet]
-demr = "CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU"
+demr = "FMcmweJZFaKd7AKkxVf2tYNakCueebbkcGVmzpHPXsba"
 mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
-staking_phase_2 = "8o2Cp5y8BPvFYsqaL9beYQPCs5Uy7XvFy5r3xvz9VNew"
+staking_phase_2 = "7sg4HY7phWephPRSLsWSaGRVeWsRmn4bk3QLUsw22wdy"
 
 [programs.localnet]
-demr = "CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU"
+demr = "FMcmweJZFaKd7AKkxVf2tYNakCueebbkcGVmzpHPXsba"
 mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
-staking_phase_2 = "8o2Cp5y8BPvFYsqaL9beYQPCs5Uy7XvFy5r3xvz9VNew"
+staking_phase_2 = "7sg4HY7phWephPRSLsWSaGRVeWsRmn4bk3QLUsw22wdy"
 
 [programs.mainnet]
 mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"

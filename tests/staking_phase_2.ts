@@ -143,6 +143,27 @@ describe("staking", () => {
   });
 
   it("demr is initialized!", async () => {
+    const receivers = [
+      new web3.PublicKey("9jJiGcPz5MjFNwiTWzTLhEv3miMSoda2Par5hRb7XJZh"),
+      new web3.PublicKey("96Tn6FpoQp4tX47dtbvzKfzLhEqBDSjpkE7LHpetvCf1"),
+      new web3.PublicKey("Cwhmcksz9zUg4ZznBWz9qZYNUHs4JjF7bZk37YDUJH9D"),
+      new web3.PublicKey("7EJLQQY9CZnceMG9wnEMA3o25sPDjNpfqnfUPkuwTaPy"),
+      new web3.PublicKey("6WFPSBF44zbZxcFfuoSdgJJkkWH8iWofZJFvNmxeo3Tt"),
+      new web3.PublicKey("9XUgPvWYyKaKz8GANHCVSsVG1ZWxhyb4Vd1XSHWZMiLj"),
+      new web3.PublicKey("6T11Yq92fCbWr1mFcPa7UPS4Uq3CjnfmtVhk2hGpBSTA"),
+      new web3.PublicKey("7kDqTzCSQ6Sp3E2co3Td8BpjAeGDQZpU3RBzBkx6ZMsC"),
+    ];
+    const amounts = [
+      new anchor.BN("3000000000000000"),
+      new anchor.BN("5000000000000000"),
+      new anchor.BN("12000000000000000"),
+      new anchor.BN("10000000000000000"),
+      new anchor.BN("2000000000000000"),
+      new anchor.BN("8000000000000000"),
+      new anchor.BN("20000000000000000"),
+      new anchor.BN("40000000000000000"),
+    ];
+
     const [MintMetadataPDA] = web3.PublicKey.findProgramAddressSync(
       [
         Buffer.Buffer.from("metadata", "utf8"),
@@ -152,33 +173,84 @@ describe("staking", () => {
       TOKEN_METADATA_PROGRAM_ID
     );
 
-    await demr.methods
-      .initialize(signer)
-      .accounts({
-        payer: provider.publicKey,
-        mint: demrMintPDA,
-        config: demrConfPDA,
-        metadataAccount:MintMetadataPDA,
-        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-      })
-      .rpc();
-  });
+    try {
+      await demr.methods
+        .initialize()
+        .accounts({
+          payer: provider.publicKey,
+          mint: demrMintPDA,
+          config: demrConfPDA,
+          metadataAccount: MintMetadataPDA,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        })
+        .rpc();
 
-  it("demr minted!", async () => {
-    const receiverAccount = getAssociatedTokenAddressSync(demrMintPDA, signer);
-    await demr.methods
-      .mintToken(new anchor.BN(10000000))
-      .accounts({
-        signer: provider.publicKey,
-        mint: demrMintPDA,
-        config: demrConfPDA,
-        receiver: signer,
-        receiverAccount: receiverAccount,
-      })
-      .rpc();
+      for (let i = 0; i < receivers.length; i++) {
+        const receiver = receivers[i];
+        await provider.sendAndConfirm(
+          new web3.Transaction().add(
+            createAssociatedTokenAccountInstruction(
+              provider.publicKey,
+              getAssociatedTokenAddressSync(demrMintPDA, receiver, true), //Associated token account
+              receiver, //token owner
+              demrMintPDA //Mint
+            )
+          )
+        );
+      }
 
-    const userAcc = await getAccount(provider.connection, receiverAccount);
-    console.log(userAcc);
+      await demr.methods
+        .initMint(amounts)
+        .accounts({
+          payer: provider.publicKey,
+          mint: demrMintPDA,
+          config: demrConfPDA,
+          receiver1Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[0],
+            true
+          ),
+          receiver2Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[1],
+            true
+          ),
+          receiver3Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[2],
+            true
+          ),
+          receiver4Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[3],
+            true
+          ),
+          receiver5Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[4],
+            true
+          ),
+          receiver6Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[5],
+            true
+          ),
+          receiver7Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[6],
+            true
+          ),
+          receiver8Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[7],
+            true
+          ),
+        })
+        .rpc();
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
   });
 
   it("nft is initialized!", async () => {
@@ -261,7 +333,34 @@ describe("staking", () => {
     try {
       const tx = await stakingPhase2.methods
         .initStaking({
+          admin: signer,
           collection: [collection1Addr, collection1Addr],
+          demrMint: demrMint,
+          energyPerBox: new anchor.BN("86400"),
+          energyPerPeriod: [new anchor.BN("100000"), new anchor.BN("100000")],
+          stakeStart: [new anchor.BN(cur), new anchor.BN(cur)],
+          demrStakeAmount: new anchor.BN("1000000000"),
+          demrPerBox: [
+            new anchor.BN("1000000000"),
+            new anchor.BN("2000000000"),
+            new anchor.BN("3000000000"),
+            new anchor.BN("4000000000"),
+            new anchor.BN("5000000000"),
+            new anchor.BN("6000000000"),
+            new anchor.BN("8000000000"),
+            new anchor.BN("10000000000"),
+          ],
+          openBoxRate: [
+            new anchor.BN("10000"),
+            new anchor.BN("24000"),
+            new anchor.BN("44000"),
+            new anchor.BN("74000"),
+            new anchor.BN("84000"),
+            new anchor.BN("94000"),
+            new anchor.BN("99000"),
+            new anchor.BN("100000"),
+          ],
+          perPeriod: new anchor.BN("86400"),
         })
         .accounts({
           poolInfo: PoolInfoPDA,
@@ -341,34 +440,7 @@ describe("staking", () => {
       const cur = Math.floor(Date.now() / 1000);
       const tx = await stakingPhase2.methods
         .updatePoolInfo({
-          admin: null,
-          collection: [collection1Addr, collection1Addr],
-          demrMint: demrMint,
-          energyPerBox: new anchor.BN("86400"),
-          energyPerPeriod: [new anchor.BN("100000"), new anchor.BN("100000")],
-          stakeStart: [new anchor.BN(cur), new anchor.BN(cur)],
-          demrStakeAmount: new anchor.BN("1000000000"),
-          demrPerBox: [
-            new anchor.BN("1000000000"),
-            new anchor.BN("2000000000"),
-            new anchor.BN("3000000000"),
-            new anchor.BN("4000000000"),
-            new anchor.BN("5000000000"),
-            new anchor.BN("6000000000"),
-            new anchor.BN("8000000000"),
-            new anchor.BN("10000000000"),
-          ],
-          openBoxRate: [
-            new anchor.BN("10000"),
-            new anchor.BN("24000"),
-            new anchor.BN("44000"),
-            new anchor.BN("74000"),
-            new anchor.BN("84000"),
-            new anchor.BN("94000"),
-            new anchor.BN("99000"),
-            new anchor.BN("100000"),
-          ],
-          perPeriod: new anchor.BN("86400"),
+          stakeEnd: [new anchor.BN(cur), new anchor.BN(cur)],
         })
         .accounts({
           poolInfo: PoolInfoPDA,

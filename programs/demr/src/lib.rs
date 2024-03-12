@@ -1,11 +1,17 @@
+use std::str::FromStr;
+
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::pubkey::Pubkey;
 use anchor_spl::{
     associated_token::AssociatedToken,
     metadata::{
         create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
         Metadata,
     },
-    token::{mint_to, Mint, MintTo, Token, TokenAccount},
+    token::{
+        mint_to, set_authority, spl_token::instruction::AuthorityType::MintTokens, Mint, MintTo,
+        SetAuthority, Token, TokenAccount,
+    },
 };
 
 #[constant]
@@ -26,21 +32,24 @@ const TOKEN_URL: &str = "https://static.demr.xyz/assets/dmr.json";
 #[constant]
 const TOKEN_DECIMALS: u8 = 6;
 
-#[constant]
-const TOKEN_TOTAL_SUPPLY: u64 = 100000000000000000;
+declare_id!("FMcmweJZFaKd7AKkxVf2tYNakCueebbkcGVmzpHPXsba");
 
-declare_id!("CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU");
+#[constant]
+const INITIALIZER: &str = "7cqdZfUkUE39eAwKsmj9PsjFTehZoxN63XVSfMe7Hx7L";
 
 #[program]
 pub mod demr {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, manager: Pubkey) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        let allowed_address = Pubkey::from_str(INITIALIZER).unwrap();
+        require!(
+            allowed_address == ctx.accounts.payer.key(),
+            DemrError::UnauthorizedAccess
+        );
         let config = &mut ctx.accounts.config;
         config.bump = ctx.bumps.config;
-        config.manager = manager;
         config.mint_bump = ctx.bumps.mint;
-        config.total_supply = TOKEN_TOTAL_SUPPLY;
 
         let seeds = CONFIG_SEED;
         let signer_seeds: &[&[&[u8]]] = &[&[seeds, &[config.bump]]];
@@ -68,39 +77,38 @@ pub mod demr {
                 collection: None,
                 uses: None,
             },
-            true,
+            false,
             true,
             None,
         )?;
-
         Ok(())
     }
 
-    pub fn mint_token(ctx: Context<MintToken>, amount: u64) -> Result<()> {
-        require_keys_eq!(
-            ctx.accounts.signer.key(),
-            ctx.accounts.config.manager,
-            DemrError::NotManager
-        );
-        // Create the MintTo struct for our context
-        let cpi_accounts = MintTo {
-            mint: ctx.accounts.mint.to_account_info(),
-            to: ctx.accounts.receiver_account.to_account_info(),
-            authority: ctx.accounts.config.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        // Create the CpiContext we need for the request
-
-        let seeds = CONFIG_SEED;
-        let signer_seeds: &[&[&[u8]]] = &[&[seeds, &[ctx.accounts.config.bump]]];
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts).with_signer(signer_seeds);
-
-        let total = amount + ctx.accounts.mint.supply;
+    pub fn init_mint(ctx: Context<InitMint>, amounts: [u64; 8]) -> Result<()> {
+        let allowed_address = Pubkey::from_str(INITIALIZER).unwrap();
         require!(
-            total <= ctx.accounts.config.total_supply,
-            DemrError::TooMuch
+            allowed_address == ctx.accounts.payer.key(),
+            DemrError::UnauthorizedAccess
         );
-        mint_to(cpi_ctx, amount)?;
+        let config = &ctx.accounts.config;
+        let seeds = CONFIG_SEED;
+        let signer_seeds: &[&[&[u8]]] = &[&[seeds, &[config.bump]]];
+
+        for receiver_index in 0..8u8 {
+            mint_to(
+                ctx.accounts
+                    .mint_to_receiver_ctx(receiver_index)
+                    .with_signer(signer_seeds),
+                amounts[receiver_index as usize],
+            )?;
+        }
+
+        set_authority(
+            ctx.accounts.set_authority_ctx().with_signer(signer_seeds),
+            MintTokens,
+            None,
+        )?;
+
         Ok(())
     }
 }
@@ -114,7 +122,6 @@ pub struct Initialize<'info> {
         payer = payer,
         mint::decimals = TOKEN_DECIMALS,
         mint::authority = config,
-        mint::freeze_authority = config,
     )]
     pub mint: Box<Account<'info, Mint>>,
 
@@ -140,57 +147,112 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct MintToken<'info> {
-    #[account(
-        mut,
-        seeds = [CONFIG_SEED],
-        bump = config.bump,
-    )]
-    pub config: Box<Account<'info, DemrConfig>>,
-
+pub struct InitMint<'info> {
     #[account(
         mut,
         seeds = [MINT_SEED],
-        bump,
+        bump=config.mint_bump,
+        mint::decimals = TOKEN_DECIMALS,
+        mint::authority = config,
     )]
     pub mint: Box<Account<'info, Mint>>,
 
-    /// CHECK
-    #[account()]
-    pub receiver: AccountInfo<'info>,
-
     #[account(
-        init_if_needed,
-        payer = signer,
-        associated_token::mint = mint,
-        associated_token::authority = receiver
+        mut,
+        seeds = [CONFIG_SEED],
+        bump=config.bump,
     )]
-    pub receiver_account: Box<Account<'info, TokenAccount>>,
+    pub config: Box<Account<'info, DemrConfig>>,
+
+    // /// CHECK
+    #[account(mut)]
+    pub receiver1_account: Box<Account<'info, TokenAccount>>,
+
+    // /// CHECK
+    #[account(mut)]
+    pub receiver2_account: Box<Account<'info, TokenAccount>>,
+
+    // /// CHECK
+    #[account(mut)]
+    pub receiver3_account: Box<Account<'info, TokenAccount>>,
+
+    // /// CHECK
+    #[account(mut)]
+    pub receiver4_account: Box<Account<'info, TokenAccount>>,
+
+    // /// CHECK
+    #[account(mut)]
+    pub receiver5_account: Box<Account<'info, TokenAccount>>,
+
+    // /// CHECK
+    #[account(mut)]
+    pub receiver6_account: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK
+    #[account(mut)]
+    pub receiver7_account: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK
+    #[account(mut)]
+    pub receiver8_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut)]
-    pub signer: Signer<'info>,
-
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+impl<'info> InitMint<'info> {
+    pub fn get_receiver_account(&self, receiver_index: u8) -> Result<AccountInfo<'info>> {
+        match receiver_index {
+            0 => Ok(self.receiver1_account.to_account_info()),
+            1 => Ok(self.receiver2_account.to_account_info()),
+            2 => Ok(self.receiver3_account.to_account_info()),
+            3 => Ok(self.receiver4_account.to_account_info()),
+            4 => Ok(self.receiver5_account.to_account_info()),
+            5 => Ok(self.receiver6_account.to_account_info()),
+            6 => Ok(self.receiver7_account.to_account_info()),
+            7 => Ok(self.receiver8_account.to_account_info()),
+            _ => err!(DemrError::Receiver),
+        }
+    }
+
+    pub fn mint_to_receiver_ctx(
+        &self,
+        receiver_index: u8,
+    ) -> CpiContext<'_, '_, '_, 'info, MintTo<'info>> {
+        let cpi_accounts = MintTo {
+            mint: self.mint.to_account_info(),
+            to: self.get_receiver_account(receiver_index).unwrap(),
+            authority: self.config.to_account_info(),
+        };
+        let cpi_program = self.token_program.to_account_info();
+        CpiContext::new(cpi_program, cpi_accounts)
+    }
+
+    pub fn set_authority_ctx(&self) -> CpiContext<'_, '_, '_, 'info, SetAuthority<'info>> {
+        let cpi_accounts = SetAuthority {
+            account_or_mint: self.mint.to_account_info().clone(),
+            current_authority: self.config.to_account_info().clone(),
+        };
+        let cpi_program = self.token_program.to_account_info();
+        CpiContext::new(cpi_program, cpi_accounts)
+    }
 }
 
 #[account]
 #[derive(InitSpace)]
 pub struct DemrConfig {
-    pub total_supply: u64,
-    pub manager: Pubkey,
     pub bump: u8,
     pub mint_bump: u8,
-    pub vesting_count: u8,
 }
 
 #[error_code]
 pub enum DemrError {
-    #[msg("mint too much")]
-    TooMuch,
-    #[msg("not manager")]
-    NotManager,
     #[msg("receiver error")]
     Receiver,
+    #[msg("UnauthorizedAccess error")]
+    UnauthorizedAccess,
 }

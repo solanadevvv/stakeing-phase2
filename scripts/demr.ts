@@ -3,6 +3,8 @@ import { Program, web3, Wallet, AnchorProvider, BN } from "@coral-xyz/anchor";
 import { Demr, IDL } from "../target/types/demr";
 import {
   getAssociatedTokenAddressSync,
+  getOrCreateAssociatedTokenAccount,
+  createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
 import * as Buffer from "buffer";
 import { PublicKey, Metaplex, Nft, Metadata } from "@metaplex-foundation/js";
@@ -21,13 +23,34 @@ describe("staking", () => {
 
   const program = new Program(
     IDL,
-    "CQE4PQ3V4jLkPw2FXDyGCuMRLyBB4zXonMCz69bT8XyU",
+    "FMcmweJZFaKd7AKkxVf2tYNakCueebbkcGVmzpHPXsba",
     anchor.getProvider()
   );
   // metaplex token metadata program ID
   const TOKEN_METADATA_PROGRAM_ID = new web3.PublicKey(
     "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
   );
+
+  const receivers = [
+    new web3.PublicKey("9jJiGcPz5MjFNwiTWzTLhEv3miMSoda2Par5hRb7XJZh"),
+    new web3.PublicKey("96Tn6FpoQp4tX47dtbvzKfzLhEqBDSjpkE7LHpetvCf1"),
+    new web3.PublicKey("Cwhmcksz9zUg4ZznBWz9qZYNUHs4JjF7bZk37YDUJH9D"),
+    new web3.PublicKey("7EJLQQY9CZnceMG9wnEMA3o25sPDjNpfqnfUPkuwTaPy"),
+    new web3.PublicKey("6WFPSBF44zbZxcFfuoSdgJJkkWH8iWofZJFvNmxeo3Tt"),
+    new web3.PublicKey("9XUgPvWYyKaKz8GANHCVSsVG1ZWxhyb4Vd1XSHWZMiLj"),
+    new web3.PublicKey("6T11Yq92fCbWr1mFcPa7UPS4Uq3CjnfmtVhk2hGpBSTA"),
+    new web3.PublicKey("7kDqTzCSQ6Sp3E2co3Td8BpjAeGDQZpU3RBzBkx6ZMsC"),
+  ];
+  const amounts = [
+    new anchor.BN("3000000000000000"),
+    new anchor.BN("5000000000000000"),
+    new anchor.BN("12000000000000000"),
+    new anchor.BN("10000000000000000"),
+    new anchor.BN("2000000000000000"),
+    new anchor.BN("8000000000000000"),
+    new anchor.BN("20000000000000000"),
+    new anchor.BN("40000000000000000"),
+  ];
 
   const [demrConfPDA] = web3.PublicKey.findProgramAddressSync(
     [Buffer.Buffer.from("config", "utf8")],
@@ -50,69 +73,82 @@ describe("staking", () => {
       ],
       TOKEN_METADATA_PROGRAM_ID
     );
+    try {
+      await program.methods
+        .initialize()
+        .accounts({
+          payer: provider.publicKey,
+          mint: demrMintPDA,
+          config: demrConfPDA,
+          metadataAccount: MintMetadataPDA,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        })
+        .rpc();
 
-    await program.methods
-      .initialize(signer)
-      .accounts({
-        payer: provider.publicKey,
-        mint: demrMintPDA,
-        config: demrConfPDA,
-        metadataAccount: MintMetadataPDA,
-        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-      })
-      .rpc();
-  });
+      for (let i = 0; i < receivers.length; i++) {
+        const receiver = receivers[i];
+        await provider.sendAndConfirm(
+          new web3.Transaction().add(
+            createAssociatedTokenAccountInstruction(
+              provider.publicKey,
+              getAssociatedTokenAddressSync(demrMintPDA, receiver, true), //Associated token account
+              receiver, //token owner
+              demrMintPDA //Mint
+            )
+          )
+        );
+      }
 
-  const mint = async (receiver: string, num: anchor.BN) => {
-    const receiverAccount = getAssociatedTokenAddressSync(
-      demrMintPDA,
-      new PublicKey(receiver),
-      true
-    );
-    await program.methods
-      .mintToken(num)
-      .accounts({
-        signer: provider.publicKey,
-        mint: demrMintPDA,
-        config: demrConfPDA,
-        receiver: receiver,
-        receiverAccount: receiverAccount,
-      })
-      .rpc();
-  };
-
-  it("demr minted!", async () => {
-    await mint(
-      "9jJiGcPz5MjFNwiTWzTLhEv3miMSoda2Par5hRb7XJZh",
-      new anchor.BN("3000000000000000")
-    );
-    await mint(
-      "96Tn6FpoQp4tX47dtbvzKfzLhEqBDSjpkE7LHpetvCf1",
-      new anchor.BN("5000000000000000")
-    );
-    await mint(
-      "Cwhmcksz9zUg4ZznBWz9qZYNUHs4JjF7bZk37YDUJH9D",
-      new anchor.BN("12000000000000000")
-    );
-    await mint(
-      "7EJLQQY9CZnceMG9wnEMA3o25sPDjNpfqnfUPkuwTaPy",
-      new anchor.BN("10000000000000000")
-    );
-    await mint(
-      "6WFPSBF44zbZxcFfuoSdgJJkkWH8iWofZJFvNmxeo3Tt",
-      new anchor.BN("2000000000000000")
-    );
-    await mint(
-      "9XUgPvWYyKaKz8GANHCVSsVG1ZWxhyb4Vd1XSHWZMiLj",
-      new anchor.BN("8000000000000000")
-    );
-    await mint(
-      "6T11Yq92fCbWr1mFcPa7UPS4Uq3CjnfmtVhk2hGpBSTA",
-      new anchor.BN("20000000000000000")
-    );
-    await mint(
-      "7kDqTzCSQ6Sp3E2co3Td8BpjAeGDQZpU3RBzBkx6ZMsC",
-      new anchor.BN("40000000000000000")
-    );
+      await program.methods
+        .initMint(amounts)
+        .accounts({
+          payer: provider.publicKey,
+          mint: demrMintPDA,
+          config: demrConfPDA,
+          receiver1Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[0],
+            true
+          ),
+          receiver2Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[1],
+            true
+          ),
+          receiver3Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[2],
+            true
+          ),
+          receiver4Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[3],
+            true
+          ),
+          receiver5Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[4],
+            true
+          ),
+          receiver6Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[5],
+            true
+          ),
+          receiver7Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[6],
+            true
+          ),
+          receiver8Account: getAssociatedTokenAddressSync(
+            demrMintPDA,
+            receivers[7],
+            true
+          ),
+        })
+        .rpc();
+    } catch (error) {
+      console.log(error);
+    }
   });
 });

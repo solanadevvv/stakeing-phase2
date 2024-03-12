@@ -29,6 +29,7 @@ pub struct Unstake<'info> {
         bump = nft_info.bump,
         has_one = nft_mint,
         has_one = staker,
+        close = staker,
     )]
     pub nft_info: Box<Account<'info, NftInfo>>,
 

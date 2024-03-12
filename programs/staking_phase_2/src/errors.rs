@@ -26,6 +26,8 @@ pub enum StakeError {
     UserAccountError,
     #[msg("staking is not start error")]
     StartError,
+    #[msg("staking is end error")]
+    EndError,
     #[msg("open box reward zero error")]
     RewardZreoError,
     #[msg("no enough energy error")]
@@ -34,4 +36,8 @@ pub enum StakeError {
     AccWritableError,
     #[msg("claimed error")]
     ClaimedError,
+    #[msg("init param error")]
+    InitParamError,
+    #[msg("UnauthorizedAccess error")]
+    UnauthorizedAccess,
 }

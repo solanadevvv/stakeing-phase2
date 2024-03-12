@@ -1,4 +1,4 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, solana_program::keccak::hashv};
 
 use crate::{
     errors::StakeError,
@@ -69,7 +69,14 @@ pub fn open_box_handler(ctx: Context<OpenBox>, args: OpenBoxArgs) -> Result<()> 
 
     let mut reward = 0_u64;
     for i in 0..args.num {
-        let random = cur_timestamp * cur_slot * (i as u64 + 1) % 100000;
+        let hash_result = hashv(&[
+            &(cur_timestamp + (i as u64)).to_be_bytes(),
+            &(cur_slot * (i as u64)).to_be_bytes(),
+            &ctx.accounts.signer.key.to_bytes(),
+        ]);
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&hash_result.to_bytes()[0..8]);
+        let random = u64::from_le_bytes(bytes) % 100000;
         let mut reward_ = 0_u64;
         for j in 0..8 {
             if random < rate[j] {
