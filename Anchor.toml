@@ -6,16 +6,13 @@ skip-lint = false
 
 [programs.devnet]
 demr = "FMcmweJZFaKd7AKkxVf2tYNakCueebbkcGVmzpHPXsba"
-mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
-staking_phase_2 = "7sg4HY7phWephPRSLsWSaGRVeWsRmn4bk3QLUsw22wdy"
 
 [programs.localnet]
 demr = "FMcmweJZFaKd7AKkxVf2tYNakCueebbkcGVmzpHPXsba"
-mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
-staking_phase_2 = "7sg4HY7phWephPRSLsWSaGRVeWsRmn4bk3QLUsw22wdy"
 
 [programs.mainnet]
-mock_nft = "C5QPdEnjyHBvNXuAZcZvwH83wXcCewr7tzaZWiePH1qv"
+demr = "FMcmweJZFaKd7AKkxVf2tYNakCueebbkcGVmzpHPXsba"
+
 
 [registry]
 url = "https://api.apr.dev"
@@ -25,12 +22,8 @@ cluster = "devnet"
 wallet = "./id.json"
 
 [scripts]
-mock_demr = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 scripts/mock_demr.ts"
 demr = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 scripts/demr.ts"
-staking = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/staking.ts"
-staking_phase_2 = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 scripts/staking_phase_2.ts"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/staking_phase_2.ts"
-test_mpl = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/mpl_api_test.ts"
 
 [[test.genesis]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
